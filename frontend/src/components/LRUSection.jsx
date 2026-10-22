@@ -476,11 +476,11 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
             id="subnav-quick-run"
           >
             {isAutoPlaying ? <Square size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
-            <span>{isAutoPlaying ? "Pause Simulation" : "▶ Run Demo"}</span>
+            <span>{isAutoPlaying ? "Pause" : "▶ Run Demo"}</span>
           </button>
           <div className="complexity-badge-right">
             <Zap size={13} className="bolt-icon" />
-            <span>Expected O(1) get / put</span>
+            <span>Expected O(1)</span>
           </div>
         </div>
       </div>
@@ -503,8 +503,8 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
                 onClick={handleToggleAutoPlay}
                 id="btn-run-here-directly"
               >
-                {isAutoPlaying ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                <span>{isAutoPlaying ? "Pause Simulation" : "▶ Run Here Directly"}</span>
+                {isAutoPlaying ? <Square size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
+                <span>{isAutoPlaying ? "Pause Run" : "▶ Direct Run"}</span>
               </button>
               <button
                 type="button"
