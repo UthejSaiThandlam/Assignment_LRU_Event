@@ -27,31 +27,31 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
   const [showCode, setShowCode] = useState(false);
   const [activeCodeLine, setActiveCodeLine] = useState(12);
 
-  // Nodes currently in cache (Initial matching the screenshot: 4, 5, 6)
+  // Nodes currently in cache (1, 10; 2, 20; 3, 30)
   const [nodes, setNodes] = useState([
-    { key: "4", value: "40" },
-    { key: "5", value: "50" },
-    { key: "6", value: "60" },
+    { key: "1", value: "10" },
+    { key: "2", value: "20" },
+    { key: "3", value: "30" },
   ]);
 
-  // Operations log (Initial matching the screenshot)
+  // Operations log (Initial operations 1, 10; 2, 20; 3, 30)
   const [logs, setLogs] = useState([
-    { step: 1, text: "put(4, 40) - Inserted key 4 with value 40", time: "10:24:01", type: "put" },
-    { step: 2, text: "put(5, 50) - Inserted key 5 with value 50", time: "10:24:05", type: "put" },
-    { step: 3, text: "put(6, 60) - Inserted key 6 with value 60", time: "10:24:08", type: "put" },
+    { step: 1, text: "put(1, 10) - Inserted key 1 with value 10", time: "10:24:01", type: "put" },
+    { step: 2, text: "put(2, 20) - Inserted key 2 with value 20", time: "10:24:05", type: "put" },
+    { step: 3, text: "put(3, 30) - Inserted key 3 with value 30", time: "10:24:08", type: "put" },
   ]);
 
-  // Status and explanation (Initial matching the screenshot: get(1) cache miss)
+  // Status and explanation (Reflecting operations 1, 10; 2, 20; 3, 30)
   const [explanation, setExplanation] = useState({
-    statusType: "miss", // "miss" | "hit" | "put"
-    headline: "get(1): Cache miss",
-    sub1: "Key 1 was not found.",
-    sub2: "Returned -1.",
-    sub3: "Cache order stays the same.",
+    statusType: "put",
+    headline: "put(3, 30): Inserted at MRU",
+    sub1: "Key 3 mapped to node (3, 30) in hash map.",
+    sub2: "Node inserted right before TAIL sentinel (MRU).",
+    sub3: "Cache capacity full: 3 / 3 slots occupied.",
     bullets: [
-      "The key 1 is not present in the hash map.",
-      "No nodes are moved in the linked list.",
-      "The cache remains: 4 → 5 → 6.",
+      "Operations executed: put(1, 10) → put(2, 20) → put(3, 30).",
+      "Current DLL recency order: 1 (Least Recently Used) → 2 → 3 (Most Recently Used).",
+      "Next put operation with a new key will evict key 1 at HEAD.next.",
     ],
   });
 
@@ -71,7 +71,7 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
     }, 700);
   };
 
-  // Sync initial state with backend
+  // Sync initial state with backend: 1, 10; 2, 20; 3, 30
   useEffect(() => {
     const syncBackend = async () => {
       try {
@@ -83,17 +83,17 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
         await apiFetch("/api/lru/put", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "4", value: "40" }),
+          body: JSON.stringify({ key: "1", value: "10" }),
         });
         await apiFetch("/api/lru/put", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "5", value: "50" }),
+          body: JSON.stringify({ key: "2", value: "20" }),
         });
         await apiFetch("/api/lru/put", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "6", value: "60" }),
+          body: JSON.stringify({ key: "3", value: "30" }),
         });
       } catch (err) {
         console.warn("Backend sync fallback initialized", err);
@@ -319,32 +319,32 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
     }
   };
 
-  // Reset Cache
+  // Reset Cache to 1, 10; 2, 20; 3, 30
   const handleReset = async () => {
     setCapacity(3);
     setKeyInput("1");
     setValInput("10");
     setNodes([
-      { key: "4", value: "40" },
-      { key: "5", value: "50" },
-      { key: "6", value: "60" },
+      { key: "1", value: "10" },
+      { key: "2", value: "20" },
+      { key: "3", value: "30" },
     ]);
     stepCounter.current = 3;
     setLogs([
-      { step: 1, text: "put(4, 40) - Inserted key 4 with value 40", time: "10:24:01", type: "put" },
-      { step: 2, text: "put(5, 50) - Inserted key 5 with value 50", time: "10:24:05", type: "put" },
-      { step: 3, text: "put(6, 60) - Inserted key 6 with value 60", time: "10:24:08", type: "put" },
+      { step: 1, text: "put(1, 10) - Inserted key 1 with value 10", time: "10:24:01", type: "put" },
+      { step: 2, text: "put(2, 20) - Inserted key 2 with value 20", time: "10:24:05", type: "put" },
+      { step: 3, text: "put(3, 30) - Inserted key 3 with value 30", time: "10:24:08", type: "put" },
     ]);
     setExplanation({
-      statusType: "miss",
-      headline: "get(1): Cache miss",
-      sub1: "Key 1 was not found.",
-      sub2: "Returned -1.",
-      sub3: "Cache order stays the same.",
+      statusType: "put",
+      headline: "put(3, 30): Inserted at MRU",
+      sub1: "Key 3 mapped to node (3, 30) in hash map.",
+      sub2: "Node inserted right before TAIL sentinel (MRU).",
+      sub3: "Cache capacity full: 3 / 3 slots occupied.",
       bullets: [
-        "The key 1 is not present in the hash map.",
-        "No nodes are moved in the linked list.",
-        "The cache remains: 4 → 5 → 6.",
+        "Operations executed: put(1, 10) → put(2, 20) → put(3, 30).",
+        "Current DLL recency order: 1 (Least Recently Used) → 2 → 3 (Most Recently Used).",
+        "Next put operation with a new key will evict key 1 at HEAD.next.",
       ],
     });
     try {
@@ -356,17 +356,17 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
       await apiFetch("/api/lru/put", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "4", value: "40" }),
+        body: JSON.stringify({ key: "1", value: "10" }),
       });
       await apiFetch("/api/lru/put", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "5", value: "50" }),
+        body: JSON.stringify({ key: "2", value: "20" }),
       });
       await apiFetch("/api/lru/put", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "6", value: "60" }),
+        body: JSON.stringify({ key: "3", value: "30" }),
       });
     } catch {
       // Offline fallback
@@ -375,14 +375,15 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
 
   // Next Step Demonstration
   const demoSequence = [
-    { type: "put", k: "4", v: "40" },
-    { type: "put", k: "5", v: "50" },
-    { type: "put", k: "6", v: "60" },
+    { type: "put", k: "1", v: "10" },
+    { type: "put", k: "2", v: "20" },
+    { type: "put", k: "3", v: "30" },
     { type: "get", k: "1" },
-    { type: "get", k: "5" },
-    { type: "put", k: "7", v: "70" },
-    { type: "get", k: "6" },
-    { type: "put", k: "8", v: "80" },
+    { type: "put", k: "4", v: "40" },
+    { type: "get", k: "2" },
+    { type: "get", k: "3" },
+    { type: "put", k: "5", v: "50" },
+    { type: "get", k: "1" },
   ];
 
   const handleNextStep = () => {
@@ -590,10 +591,12 @@ export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
             <div className="example-ops-container">
               <span className="example-ops-heading">Example Operations</span>
               <div className="example-ops-grid">
-                <button type="button" className="btn-op-pill" onClick={() => handlePut("4", "40")}>put(4, 40)</button>
-                <button type="button" className="btn-op-pill" onClick={() => handlePut("5", "50")}>put(5, 50)</button>
-                <button type="button" className="btn-op-pill" onClick={() => handlePut("6", "60")}>put(6, 60)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("1", "10")}>put(1, 10)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("2", "20")}>put(2, 20)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("3", "30")}>put(3, 30)</button>
                 <button type="button" className="btn-op-pill" onClick={() => handleGet("1")}>get(1)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("4", "40")}>put(4, 40)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handleGet("2")}>get(2)</button>
               </div>
             </div>
 
