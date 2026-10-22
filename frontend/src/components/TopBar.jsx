@@ -1,37 +1,39 @@
 import React from "react";
 import { Sun, Moon, Play } from "lucide-react";
 
-export default function TopBar({ theme, toggleTheme, onRunAllDemos }) {
+export default function TopBar({ theme, toggleTheme, onRunDemo }) {
   return (
     <header className="top-header">
       <div className="header-title-group">
-        <h1>Algorithm Visualizer</h1>
-        <p>Interactive visualization of two classic problems: LRU Cache and Meeting Room Scheduler</p>
+        <h1 className="header-main-title">Algorithm Playground</h1>
+        <p className="header-subtitle">Explore how the algorithms work, step by step.</p>
       </div>
 
       <div className="header-actions">
-        {/* Light / Dark Mode Toggle */}
-        <div className="theme-switch">
+        {/* Segmented Light / Dark Mode Toggle */}
+        <div className="theme-switch-pill">
           <button
-            className={`theme-btn ${theme === "light" ? "active" : ""}`}
+            className={`theme-pill-btn ${theme === "light" ? "active" : ""}`}
             onClick={() => toggleTheme("light")}
+            type="button"
           >
             <Sun size={13} />
             <span>Light</span>
           </button>
           <button
-            className={`theme-btn ${theme === "dark" ? "active" : ""}`}
+            className={`theme-pill-btn ${theme === "dark" ? "active" : ""}`}
             onClick={() => toggleTheme("dark")}
+            type="button"
           >
             <Moon size={13} />
             <span>Dark</span>
           </button>
         </div>
 
-        {/* Run All Demos Button */}
-        <button className="btn-run-all" onClick={onRunAllDemos}>
-          <Play size={13} fill="#ffffff" />
-          <span>Run All Demos</span>
+        {/* Run Demo Button */}
+        <button className="btn-run-demo-primary" onClick={onRunDemo} type="button">
+          <Play size={13} fill="currentColor" />
+          <span>Run Demo</span>
         </button>
       </div>
     </header>

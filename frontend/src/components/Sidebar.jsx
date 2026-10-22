@@ -1,26 +1,28 @@
 import React from "react";
-import { Database, Calendar, BookOpen, Info, Box } from "lucide-react";
+import { LayoutDashboard, Database, Calendar, FileText, Box } from "lucide-react";
 
 export default function Sidebar({ activeView, setActiveView }) {
   const navItems = [
-    { id: "lru", label: "1. LRU Cache", icon: Database },
-    { id: "scheduler", label: "2. Meeting Rooms", icon: Calendar },
-    { id: "docs", label: "Documentation", icon: BookOpen },
-    { id: "about", label: "About", icon: Info },
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "lru", label: "LRU Cache", icon: Database },
+    { id: "scheduler", label: "Meeting Rooms", icon: Calendar },
+    { id: "docs", label: "Documentation", icon: FileText },
   ];
 
   return (
     <aside className="sidebar">
+      {/* Brand Header */}
       <div className="sidebar-logo">
         <div className="logo-cube">
-          <Box size={26} strokeWidth={2.2} />
+          <Box size={22} className="cube-icon" />
         </div>
         <div className="logo-title">
-          <span>Algorithm</span>
-          <span>Visualizer</span>
+          <span className="logo-playground">Algorithm</span>
+          <span className="logo-playground-sub">Playground</span>
         </div>
       </div>
 
+      {/* Nav Menu */}
       <nav className="sidebar-nav">
         {navItems.map((item) => {
           const Icon = item.icon;

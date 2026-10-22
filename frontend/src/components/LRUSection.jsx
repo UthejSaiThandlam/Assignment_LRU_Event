@@ -1,49 +1,63 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Box, Play, Square, RotateCcw, Plus, Minus, Search, ArrowRight } from "lucide-react";
+import { 
+  Database, 
+  Calendar, 
+  Zap, 
+  Minus, 
+  Plus, 
+  RotateCcw, 
+  Play, 
+  Square, 
+  Code, 
+  ChevronDown, 
+  ChevronUp, 
+  XCircle, 
+  CheckCircle2, 
+  PlusCircle, 
+  ArrowRight 
+} from "lucide-react";
 import { apiFetch } from "../utils/api";
 
-export default function LRUSection({ autoStartDemo }) {
-  const [capacity, setCapacity] = useState(5);
+export default function LRUSection({ onSwitchToScheduler, autoStartDemo }) {
+  const [capacity, setCapacity] = useState(3);
   const [keyInput, setKeyInput] = useState("1");
   const [valInput, setValInput] = useState("10");
-  const [highlightCode, setHighlightCode] = useState(true);
-  const [activeCodeLine, setActiveCodeLine] = useState(17);
   const [activeKey, setActiveKey] = useState(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const [activeCodeLine, setActiveCodeLine] = useState(12);
 
-  // Live Metrics
-  const [metrics, setMetrics] = useState({
-    hits: 1,
-    misses: 0,
-    evictions: 0,
-  });
-
-  // Balanced in-sync initial chain: [2: 20] (LRU), [3: 30], [1: 10] (MRU)
+  // Nodes currently in cache (Initial matching the screenshot: 4, 5, 6)
   const [nodes, setNodes] = useState([
-    { key: "2", value: "20" },
-    { key: "3", value: "30" },
-    { key: "1", value: "10" },
+    { key: "4", value: "40" },
+    { key: "5", value: "50" },
+    { key: "6", value: "60" },
   ]);
 
-  const stepCounter = useRef(4);
-  const autoPlayTimer = useRef(null);
-
+  // Operations log (Initial matching the screenshot)
   const [logs, setLogs] = useState([
-    { step: 1, text: "put(1, 10) - Insert key 1 with value 10", time: "10:24:01", type: "put" },
-    { step: 2, text: "put(2, 20) - Insert key 2 with value 20", time: "10:24:05", type: "put" },
-    { step: 3, text: "put(3, 30) - Insert key 3 with value 30", time: "10:24:08", type: "put" },
-    { step: 4, text: "get(1) - Hit! Returned 10 (moved to MRU)", time: "10:24:12", type: "get" },
+    { step: 1, text: "put(4, 40) - Inserted key 4 with value 40", time: "10:24:01", type: "put" },
+    { step: 2, text: "put(5, 50) - Inserted key 5 with value 50", time: "10:24:05", type: "put" },
+    { step: 3, text: "put(6, 60) - Inserted key 6 with value 60", time: "10:24:08", type: "put" },
   ]);
 
+  // Status and explanation (Initial matching the screenshot: get(1) cache miss)
   const [explanation, setExplanation] = useState({
-    title: "get(1) -> Hit! (Value: 10)",
+    statusType: "miss", // "miss" | "hit" | "put"
+    headline: "get(1): Cache miss",
+    sub1: "Key 1 was not found.",
+    sub2: "Returned -1.",
+    sub3: "Cache order stays the same.",
     bullets: [
-      "Key 1 was accessed in O(1) time via hash map lookup.",
-      "Unlinked node 1 from its previous position.",
-      "Promoted node 1 to the MRU position right before Tail sentinel.",
-      "Time complexity: O(1)",
+      "The key 1 is not present in the hash map.",
+      "No nodes are moved in the linked list.",
+      "The cache remains: 4 → 5 → 6.",
     ],
   });
+
+  const stepCounter = useRef(3);
+  const autoPlayTimer = useRef(null);
+  const demoStepIndex = useRef(0);
 
   const getTimeString = () => {
     const d = new Date();
@@ -57,49 +71,40 @@ export default function LRUSection({ autoStartDemo }) {
     }, 700);
   };
 
-  // Reinitialize clean synced state with backend on mount
+  // Sync initial state with backend
   useEffect(() => {
-    const initCleanState = async () => {
+    const syncBackend = async () => {
       try {
         await apiFetch("/api/lru/init", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ capacity: 5 }),
+          body: JSON.stringify({ capacity: 3 }),
         });
         await apiFetch("/api/lru/put", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "1", value: "10" }),
+          body: JSON.stringify({ key: "4", value: "40" }),
         });
         await apiFetch("/api/lru/put", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "2", value: "20" }),
+          body: JSON.stringify({ key: "5", value: "50" }),
         });
         await apiFetch("/api/lru/put", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "3", value: "30" }),
+          body: JSON.stringify({ key: "6", value: "60" }),
         });
-        const res = await apiFetch("/api/lru/get", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "1" }),
-        });
-        const data = await res.json();
-        if (data.state && data.state.chain) {
-          setNodes(data.state.chain);
-        }
       } catch (err) {
-        console.warn("Could not sync with backend initial state", err);
+        console.warn("Backend sync fallback initialized", err);
       }
     };
-    initCleanState();
+    syncBackend();
   }, []);
 
-  // When capacity changes smoothly via stepper or pills
+  // Capacity change
   const handleCapacityChange = async (newVal) => {
-    const parsedCap = Math.max(1, Math.min(10, parseInt(newVal, 10) || 1));
+    const parsedCap = Math.max(1, Math.min(8, parseInt(newVal, 10) || 1));
     if (parsedCap === capacity) return;
     setCapacity(parsedCap);
     setActiveCodeLine(3);
@@ -112,12 +117,8 @@ export default function LRUSection({ autoStartDemo }) {
         body: JSON.stringify({ capacity: parsedCap }),
       });
       const data = await res.json();
-      if (data.evicted) {
-        evictedItems = data.evicted;
-      }
-      if (data.state && data.state.chain) {
-        setNodes(data.state.chain);
-      }
+      if (data.evicted) evictedItems = data.evicted;
+      if (data.state && data.state.chain) setNodes(data.state.chain);
     } catch {
       setNodes((prev) => {
         if (prev.length > parsedCap) {
@@ -126,10 +127,6 @@ export default function LRUSection({ autoStartDemo }) {
         }
         return prev;
       });
-    }
-
-    if (evictedItems.length > 0) {
-      setMetrics((prev) => ({ ...prev, evictions: prev.evictions + evictedItems.length }));
     }
 
     stepCounter.current += 1;
@@ -141,10 +138,14 @@ export default function LRUSection({ autoStartDemo }) {
       time: getTimeString(),
       type: "config",
     };
-    setLogs((prev) => [...prev.slice(-6), newLog]);
+    setLogs((prev) => [...prev.slice(-5), newLog]);
 
     setExplanation({
-      title: `Capacity updated to ${parsedCap}`,
+      statusType: "put",
+      headline: `Capacity changed to ${parsedCap}`,
+      sub1: `Storage limit updated to ${parsedCap}.`,
+      sub2: evictedItems.length > 0 ? `Evicted ${evictedItems.length} LRU node(s).` : `Cache has capacity for ${parsedCap} items.`,
+      sub3: "All active pointers preserved.",
       bullets: [
         `Adjusted maximum cache storage limit to ${parsedCap}.`,
         evictedItems.length > 0
@@ -155,9 +156,9 @@ export default function LRUSection({ autoStartDemo }) {
     });
   };
 
-  // Smooth Direct Put Action
+  // Put Action
   const handlePut = async (customKey, customVal) => {
-    const k = customKey !== undefined ? String(customKey) : keyInput.trim() || "1";
+    const k = customKey !== undefined ? String(customKey) : keyInput.trim() || "4";
     const v = customVal !== undefined ? String(customVal) : valInput.trim() || `${k}0`;
 
     setKeyInput(k);
@@ -181,7 +182,6 @@ export default function LRUSection({ autoStartDemo }) {
         setNodes(data.state.chain);
       }
     } catch {
-      // Local fallback
       setNodes((prev) => {
         const exists = prev.some((n) => n.key === k);
         isUpdate = exists;
@@ -194,16 +194,12 @@ export default function LRUSection({ autoStartDemo }) {
       });
     }
 
-    if (evicted) {
-      setMetrics((prev) => ({ ...prev, evictions: prev.evictions + 1 }));
-    }
-
     stepCounter.current += 1;
-    let logText = `put(${k}, ${v}) - Inserted key ${k} at MRU`;
+    let logText = `put(${k}, ${v}) - Inserted key ${k} with value ${v}`;
     if (evicted) {
-      logText = `put(${k}, ${v}) - Cache full! Evicted key ${evicted}, inserted ${k}`;
+      logText = `put(${k}, ${v}) - Evicted LRU key ${evicted}, inserted ${k}`;
     } else if (isUpdate) {
-      logText = `put(${k}, ${v}) - Updated key ${k} to value ${v} (moved to MRU)`;
+      logText = `put(${k}, ${v}) - Updated key ${k} to value ${v}`;
     }
 
     const newLog = {
@@ -212,33 +208,39 @@ export default function LRUSection({ autoStartDemo }) {
       time: getTimeString(),
       type: "put",
     };
-    setLogs((prev) => [...prev.slice(-6), newLog]);
+    setLogs((prev) => [...prev.slice(-5), newLog]);
 
     setExplanation({
-      title: isUpdate ? `put(${k}, ${v}) -> Key Updated` : `put(${k}, ${v}) -> Inserted at MRU`,
+      statusType: "put",
+      headline: isUpdate
+        ? `put(${k}, ${v}): Key updated`
+        : evicted
+        ? `put(${k}, ${v}): Evicted ${evicted} & inserted ${k}`
+        : `put(${k}, ${v}): Inserted at MRU`,
+      sub1: isUpdate ? `Key ${k} already existed.` : `Node (${k}, ${v}) added to MRU.`,
+      sub2: evicted ? `Evicted LRU node ${evicted} to maintain capacity ${capacity}.` : `Value set to ${v}.`,
+      sub3: "Cache pointers updated in O(1) time.",
       bullets: isUpdate
         ? [
-            `Key '${k}' already exists in hash map. Value updated to '${v}'.`,
-            `Unlinked node '${k}' from current position and moved to MRU end before Tail.`,
-            "Time complexity: O(1)",
+            `The key ${k} was already present in the hash map.`,
+            `Value was updated to ${v}.`,
+            `Node was moved to the MRU position (before TAIL).`,
           ]
         : evicted
         ? [
-            `Cache reached maximum capacity (${capacity}).`,
-            `Evicted oldest LRU node '${evicted}' from head.next.`,
-            `Appended new node '${k}' directly before Tail sentinel at MRU position.`,
-            "Time complexity: O(1)",
+            `Cache reached maximum capacity of ${capacity}.`,
+            `The oldest node (${evicted}) at HEAD.next was evicted.`,
+            `New node (${k}, ${v}) appended at MRU.`,
           ]
         : [
-            `Stored key '${k}' -> node mapping in the hash map.`,
-            `Appended node '${k}' directly before Tail sentinel at MRU position.`,
-            `Current items in cache: ${nodes.length + 1} / ${capacity}.`,
-            "Time complexity: O(1)",
+            `Stored key ${k} in hash map pointing to new node.`,
+            `Node inserted at MRU right before TAIL sentinel.`,
+            `Current items: ${Math.min(nodes.length + 1, capacity)} / ${capacity}.`,
           ],
     });
   };
 
-  // Smooth Direct Get Action
+  // Get Action
   const handleGet = async (customKey) => {
     const k = customKey !== undefined ? String(customKey) : keyInput.trim() || "1";
     setKeyInput(k);
@@ -261,476 +263,545 @@ export default function LRUSection({ autoStartDemo }) {
         setNodes(data.state.chain);
       }
     } catch {
-      // Local fallback
-      setNodes((prev) => {
-        const target = prev.find((n) => n.key === k);
-        if (!target) return prev;
+      const nodeIndex = nodes.findIndex((n) => n.key === k);
+      if (nodeIndex !== -1) {
         found = true;
-        foundValue = target.value;
-        return [...prev.filter((n) => n.key !== k), target];
-      });
-    }
-
-    if (found) {
-      setMetrics((prev) => ({ ...prev, hits: prev.hits + 1 }));
-      setValInput(String(foundValue));
-    } else {
-      setMetrics((prev) => ({ ...prev, misses: prev.misses + 1 }));
+        foundValue = nodes[nodeIndex].value;
+        setNodes((prev) => {
+          const target = prev[nodeIndex];
+          const remaining = prev.filter((_, idx) => idx !== nodeIndex);
+          return [...remaining, target];
+        });
+      }
     }
 
     stepCounter.current += 1;
+    let logText = `get(${k}) - Hit! Returned ${foundValue} (moved to MRU)`;
+    if (!found) {
+      logText = `get(${k}) - Miss! Key not found (returned -1)`;
+    }
+
     const newLog = {
       step: stepCounter.current,
-      text: found
-        ? `get(${k}) - Hit! Returned value ${foundValue} (moved to MRU)`
-        : `get(${k}) - Miss! Key '${k}' not in cache (-1)`,
+      text: logText,
       time: getTimeString(),
-      type: found ? "get" : "miss",
+      type: found ? "hit" : "miss",
     };
-    setLogs((prev) => [...prev.slice(-6), newLog]);
+    setLogs((prev) => [...prev.slice(-5), newLog]);
 
-    setExplanation({
-      title: found ? `get(${k}) -> Hit! (Value: ${foundValue})` : `get(${k}) -> Cache Miss (-1)`,
-      bullets: found
-        ? [
-            `Key '${k}' found in hash map in O(1) time with value '${foundValue}'.`,
-            `Unlinked node '${k}' from doubly linked list.`,
-            `Appended node '${k}' to MRU position right before Tail sentinel.`,
-            "Time complexity: O(1)",
-          ]
-        : [
-            `Key '${k}' was not found in hash map.`,
-            `Returned -1 to signal cache miss.`,
-            `Doubly linked list remains unchanged.`,
-            "Time complexity: O(1)",
-          ],
-    });
+    if (found) {
+      setExplanation({
+        statusType: "hit",
+        headline: `get(${k}): Cache hit!`,
+        sub1: `Key ${k} found with value ${foundValue}.`,
+        sub2: `Returned ${foundValue}.`,
+        sub3: "Moved node to MRU position.",
+        bullets: [
+          `Key ${k} was found in the hash map in O(1) time.`,
+          `Node unlinked from its position and moved to MRU.`,
+          `Recent items order refreshed.`,
+        ],
+      });
+    } else {
+      const currentChainStr = nodes.map((n) => n.key).join(" → ");
+      setExplanation({
+        statusType: "miss",
+        headline: `get(${k}): Cache miss`,
+        sub1: `Key ${k} was not found.`,
+        sub2: "Returned -1.",
+        sub3: "Cache order stays the same.",
+        bullets: [
+          `The key ${k} is not present in the hash map.`,
+          "No nodes are moved in the linked list.",
+          `The cache remains: ${currentChainStr || "empty"}.`,
+        ],
+      });
+    }
   };
 
-  // Reset Cache Cleanly
+  // Reset Cache
   const handleReset = async () => {
-    setActiveCodeLine(2);
+    setCapacity(3);
+    setKeyInput("1");
+    setValInput("10");
+    setNodes([
+      { key: "4", value: "40" },
+      { key: "5", value: "50" },
+      { key: "6", value: "60" },
+    ]);
+    stepCounter.current = 3;
+    setLogs([
+      { step: 1, text: "put(4, 40) - Inserted key 4 with value 40", time: "10:24:01", type: "put" },
+      { step: 2, text: "put(5, 50) - Inserted key 5 with value 50", time: "10:24:05", type: "put" },
+      { step: 3, text: "put(6, 60) - Inserted key 6 with value 60", time: "10:24:08", type: "put" },
+    ]);
+    setExplanation({
+      statusType: "miss",
+      headline: "get(1): Cache miss",
+      sub1: "Key 1 was not found.",
+      sub2: "Returned -1.",
+      sub3: "Cache order stays the same.",
+      bullets: [
+        "The key 1 is not present in the hash map.",
+        "No nodes are moved in the linked list.",
+        "The cache remains: 4 → 5 → 6.",
+      ],
+    });
     try {
       await apiFetch("/api/lru/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ capacity }),
+        body: JSON.stringify({ capacity: 3 }),
       });
-    } catch {}
-    setNodes([]);
-    stepCounter.current = 1;
-    setMetrics({ hits: 0, misses: 0, evictions: 0 });
-    setLogs([
-      { step: 1, text: `Cache reset with capacity ${capacity}`, time: getTimeString(), type: "config" },
-    ]);
-    setExplanation({
-      title: "Cache Reset",
-      bullets: [
-        `Initialized empty doubly linked list with sentinel Head and Tail.`,
-        `Hash map cleared to store up to ${capacity} entries.`,
-        `Capacity: ${capacity}.`,
-        "Time complexity: O(1)",
-      ],
-    });
+      await apiFetch("/api/lru/put", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "4", value: "40" }),
+      });
+      await apiFetch("/api/lru/put", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "5", value: "50" }),
+      });
+      await apiFetch("/api/lru/put", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "6", value: "60" }),
+      });
+    } catch {
+      // Offline fallback
+    }
   };
 
-  // Live Auto-Play Simulation
+  // Next Step Demonstration
+  const demoSequence = [
+    { type: "put", k: "4", v: "40" },
+    { type: "put", k: "5", v: "50" },
+    { type: "put", k: "6", v: "60" },
+    { type: "get", k: "1" },
+    { type: "get", k: "5" },
+    { type: "put", k: "7", v: "70" },
+    { type: "get", k: "6" },
+    { type: "put", k: "8", v: "80" },
+  ];
+
+  const handleNextStep = () => {
+    const op = demoSequence[demoStepIndex.current % demoSequence.length];
+    demoStepIndex.current += 1;
+    if (op.type === "put") {
+      handlePut(op.k, op.v);
+    } else {
+      handleGet(op.k);
+    }
+  };
+
+  // Auto-play Toggle
   const handleToggleAutoPlay = () => {
     if (isAutoPlaying) {
       clearInterval(autoPlayTimer.current);
       setIsAutoPlaying(false);
-      return;
+    } else {
+      setIsAutoPlaying(true);
+      handleNextStep();
+      autoPlayTimer.current = setInterval(() => {
+        handleNextStep();
+      }, 1900);
     }
-
-    setIsAutoPlaying(true);
-    const demoSteps = [
-      () => handlePut("1", "10"),
-      () => handlePut("2", "20"),
-      () => handlePut("3", "30"),
-      () => handleGet("1"),
-      () => handlePut("4", "40"),
-      () => handleGet("2"),
-      () => handlePut("5", "50"),
-      () => handlePut("6", "60"), // triggers eviction
-      () => handleGet("1"),
-    ];
-
-    let currentStep = 0;
-    autoPlayTimer.current = setInterval(() => {
-      if (currentStep < demoSteps.length) {
-        demoSteps[currentStep]();
-        currentStep++;
-      } else {
-        clearInterval(autoPlayTimer.current);
-        setIsAutoPlaying(false);
-      }
-    }, 1300);
   };
 
   useEffect(() => {
     if (autoStartDemo) {
-      const timer = setTimeout(() => {
-        handleToggleAutoPlay();
-      }, 300);
-      return () => clearTimeout(timer);
+      handleToggleAutoPlay();
     }
+    return () => clearInterval(autoPlayTimer.current);
   }, [autoStartDemo]);
 
-  useEffect(() => {
-    return () => {
-      if (autoPlayTimer.current) clearInterval(autoPlayTimer.current);
-    };
-  }, []);
-
-  const totalHitsMisses = metrics.hits + metrics.misses;
-  const hitRatio = totalHitsMisses > 0 ? Math.round((metrics.hits / totalHitsMisses) * 100) : 0;
-  const capacityPercent = Math.min(100, Math.round((nodes.length / (capacity || 1)) * 100));
-
+  // Python LRU Cache Reference Code
   const codeLines = [
     { num: 1, text: "class LRUCache:" },
     { num: 2, text: "    def __init__(self, capacity: int):" },
     { num: 3, text: "        self.capacity = capacity" },
-    { num: 4, text: "        self.cache = {}" },
-    { num: 5, text: "        self.head = ListNode(0, 0)" },
-    { num: 6, text: "        self.tail = ListNode(0, 0)" },
+    { num: 4, text: "        self.cache = {}  # key -> ListNode" },
+    { num: 5, text: "        self.head = ListNode(0, 0)  # Sentinel HEAD" },
+    { num: 6, text: "        self.tail = ListNode(0, 0)  # Sentinel TAIL" },
     { num: 7, text: "        self.head.next = self.tail" },
     { num: 8, text: "        self.tail.prev = self.head" },
     { num: 9, text: "" },
     { num: 10, text: "    def get(self, key: int) -> int:" },
     { num: 11, text: "        if key not in self.cache:" },
-    { num: 12, text: "            return -1" },
+    { num: 12, text: "            return -1  # Cache Miss" },
     { num: 13, text: "        node = self.cache[key]" },
-    { num: 14, text: "        self._move_to_end(node)" },
-    { num: 15, text: "        return node.value" },
-    { num: 16, text: "" },
-    { num: 17, text: "    def put(self, key: int, value: int) -> None:" },
-    { num: 18, text: "        if key in self.cache:" },
-    { num: 19, text: "            self._remove(self.cache[key])" },
-    { num: 20, text: "        node = ListNode(key, value)" },
-    { num: 21, text: "        self._add_to_end(node)" },
-    { num: 22, text: "        self.cache[key] = node" },
-    { num: 23, text: "        if len(self.cache) > self.capacity:" },
-    { num: 24, text: "            lru = self.head.next" },
-    { num: 25, text: "            self._remove(lru)" },
-    { num: 26, text: "            del self.cache[lru.key]" },
+    { num: 14, text: "        self._remove(node)" },
+    { num: 15, text: "        self._add_to_tail(node)  # Move to MRU" },
+    { num: 16, text: "        return node.value" },
+    { num: 17, text: "" },
+    { num: 18, text: "    def put(self, key: int, value: int) -> None:" },
+    { num: 19, text: "        if key in self.cache:" },
+    { num: 20, text: "            self._remove(self.cache[key])" },
+    { num: 21, text: "        node = ListNode(key, value)" },
+    { num: 22, text: "        self._add_to_tail(node)" },
+    { num: 23, text: "        self.cache[key] = node" },
+    { num: 24, text: "        if len(self.cache) > self.capacity:" },
+    { num: 25, text: "            lru = self.head.next  # Evict oldest" },
+    { num: 26, text: "            self._remove(lru)" },
+    { num: 27, text: "            del self.cache[lru.key]" },
   ];
 
   return (
-    <section className="algo-card" id="lru-section">
-      {/* Card Header */}
-      <div className="algo-card-header">
-        <div className="card-title-left">
-          <div className="icon-box blue">
-            <Box size={18} />
-          </div>
-          <div className="title-text-group">
-            <div className="title-row">
-              <h2>1. LRU Cache</h2>
-              <span className="pill-concept">Hash Map + Doubly Linked List</span>
-            </div>
-            <p className="card-subtitle">Design a data structure that supports get and put in O(1) time.</p>
-          </div>
+    <div className="playground-view-container">
+      {/* Subheader Tab Navigation Bar */}
+      <div className="subnav-tab-bar">
+        <div className="tab-pills-group">
+          <button className="tab-pill active" type="button">
+            <Database size={15} />
+            <span>LRU Cache</span>
+          </button>
+          <button 
+            className="tab-pill inactive" 
+            type="button" 
+            onClick={onSwitchToScheduler}
+          >
+            <Calendar size={15} />
+            <span>Meeting Room Scheduler</span>
+          </button>
         </div>
 
-        <div className="card-badges-right">
-          <div className="complexity-pill green">
-            <span className="pill-label">Time Complexity</span>
-            <span className="pill-val">O(1)</span>
-          </div>
-          <div className="complexity-pill purple">
-            <span className="pill-label">Space Complexity</span>
-            <span className="pill-val">O(n)</span>
+        <div className="subnav-right-actions">
+          <button
+            type="button"
+            className={`subnav-quick-run-btn ${isAutoPlaying ? "running" : ""}`}
+            onClick={handleToggleAutoPlay}
+            title="Toggle automatic simulation"
+            id="subnav-quick-run"
+          >
+            {isAutoPlaying ? <Square size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
+            <span>{isAutoPlaying ? "Pause Simulation" : "▶ Run Demo"}</span>
+          </button>
+          <div className="complexity-badge-right">
+            <Zap size={13} className="bolt-icon" />
+            <span>Expected O(1) get / put</span>
           </div>
         </div>
       </div>
 
-      {/* 3-Column Body: Balanced & Even */}
-      <div className="card-3col-grid">
-        {/* Col 1: Smooth & Intuitive Controls */}
-        <div className="col-controls">
-          <div className="controls-top-group">
-            <span className="section-label">Controls</span>
+      {/* Top 3-Column Grid */}
+      <div className="playground-3col-grid">
+        {/* CARD 1: 1. Controls */}
+        <div className="playground-card card-controls">
+          <div className="card-header-simple">
+            <h3 className="card-title">1. Controls</h3>
+            <p className="card-desc">Add or get items from the cache.</p>
+          </div>
 
-            {/* Smooth Capacity Stepper + Quick Presets */}
-            <div className="capacity-control-row">
-              <span className="field-label">Capacity:</span>
-              <div className="stepper-wrap">
+          <div className="card-controls-body">
+            {/* DIRECT ONE-CLICK RUN BUTTON */}
+            <div className="direct-run-banner">
+              <button
+                type="button"
+                className={`btn-direct-run-main ${isAutoPlaying ? "running" : ""}`}
+                onClick={handleToggleAutoPlay}
+                id="btn-run-here-directly"
+              >
+                {isAutoPlaying ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                <span>{isAutoPlaying ? "Pause Simulation" : "▶ Run Here Directly"}</span>
+              </button>
+              <button
+                type="button"
+                className="btn-direct-step-next"
+                onClick={handleNextStep}
+                title="Execute next step"
+                id="btn-next-step-direct"
+              >
+                <span>Next &gt;</span>
+              </button>
+            </div>
+
+            {/* Capacity Control */}
+            <div className="control-field-row">
+              <span className="control-field-label">Capacity</span>
+              <div className="stepper-widget">
                 <button
-                  className="btn-stepper"
+                  type="button"
+                  className="stepper-action-btn"
                   onClick={() => handleCapacityChange(capacity - 1)}
                   disabled={capacity <= 1}
                   title="Decrease Capacity"
                 >
-                  <Minus size={11} />
+                  <Minus size={13} />
                 </button>
-                <span className="capacity-badge">{capacity}</span>
+                <span className="stepper-number">{capacity}</span>
                 <button
-                  className="btn-stepper"
+                  type="button"
+                  className="stepper-action-btn"
                   onClick={() => handleCapacityChange(capacity + 1)}
-                  disabled={capacity >= 10}
+                  disabled={capacity >= 8}
                   title="Increase Capacity"
                 >
-                  <Plus size={11} />
+                  <Plus size={13} />
                 </button>
               </div>
-              <div className="quick-cap-pills">
-                {[3, 4, 5, 8].map((c) => (
-                  <button
-                    key={c}
-                    className={`btn-cap-pill ${capacity === c ? "active" : ""}`}
-                    onClick={() => handleCapacityChange(c)}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            {/* Smooth Key & Value Inputs */}
-            <div className="inputs-row">
-              <div style={{ flex: 1 }}>
-                <span className="field-label" style={{ display: "block", marginBottom: "2px" }}>Key</span>
-                <input
-                  type="text"
-                  placeholder="Key (e.g. 1)"
-                  className="input-keyval"
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handlePut();
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <span className="field-label" style={{ display: "block", marginBottom: "2px" }}>Value</span>
-                <input
-                  type="text"
-                  placeholder="Val (e.g. 10)"
-                  className="input-keyval"
-                  value={valInput}
-                  onChange={(e) => setValInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handlePut();
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Direct Put & Get Action Buttons (No Dropdown!) */}
-            <div className="action-buttons-row">
-              <button
-                className="btn-action-put"
-                onClick={() => handlePut()}
-                title="Insert or update key in O(1)"
-              >
-                + Put(key, val)
-              </button>
-              <button
-                className="btn-action-get"
-                onClick={() => handleGet()}
-                title="Lookup key in O(1) and promote to MRU"
-              >
-                <Search size={11} /> Get(key)
-              </button>
-            </div>
-
-            {/* Quick Demos & Presets */}
-            <span className="section-label" style={{ marginTop: "1px", fontSize: "11px" }}>Quick Operations</span>
-            <div className="example-ops-grid">
-              <button className="btn-op-pill" onClick={() => handlePut("1", "10")}>put(1, 10)</button>
-              <button className="btn-op-pill" onClick={() => handlePut("2", "20")}>put(2, 20)</button>
-              <button className="btn-op-pill" onClick={() => handlePut("3", "30")}>put(3, 30)</button>
-              <button className="btn-op-pill" onClick={() => handleGet("1")}>get(1)</button>
-              <button className="btn-op-pill" onClick={() => handlePut("4", "40")}>put(4, 40)</button>
-              <button className="btn-op-pill" onClick={() => handleGet("2")}>get(2)</button>
-            </div>
-
-            {/* Auto-Play Simulation & Reset Buttons */}
-            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-              <button
-                className={`btn-autoplay ${isAutoPlaying ? "playing" : ""}`}
-                style={{ flex: 1, padding: "5px 8px", fontSize: "11px" }}
-                onClick={handleToggleAutoPlay}
-              >
-                {isAutoPlaying ? <Square size={11} fill="#ffffff" /> : <Play size={11} fill="#ffffff" />}
-                <span>{isAutoPlaying ? "Stop Simulation" : "▶ Live Auto-Play"}</span>
-              </button>
-              <button
-                className="btn-reset-center"
-                style={{ padding: "5px 8px" }}
-                onClick={handleReset}
-                title="Reset Cache"
-              >
-                <RotateCcw size={11} />
-              </button>
-            </div>
-          </div>
-
-          {/* Live Metrics Engine Panel */}
-          <div className="metrics-status-box">
-            <div className="metrics-header">
-              <span className="metrics-title">
-                <span className="live-dot" />
-                Live Cache Engine
-              </span>
-              <span style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--badge-green-text)" }}>
-                {nodes.length}/{capacity} Slots ({capacityPercent}%)
-              </span>
-            </div>
-            <div className="meter-bar-track">
-              <div
-                className="meter-bar-fill"
-                style={{ width: `${capacityPercent}%` }}
+            {/* Key Input */}
+            <div className="control-field-row">
+              <span className="control-field-label">Key</span>
+              <input
+                type="text"
+                className="control-text-input"
+                placeholder="e.g. 1"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handlePut()}
               />
             </div>
-            <div className="metrics-stats-row">
-              <span>Hits: <strong>{metrics.hits}</strong></span>
-              <span>Miss: <strong>{metrics.misses}</strong></span>
-              <span>Evicted: <strong>{metrics.evictions}</strong></span>
+
+            {/* Value Input */}
+            <div className="control-field-row">
+              <span className="control-field-label">Value</span>
+              <input
+                type="text"
+                className="control-text-input"
+                placeholder="e.g. 10"
+                value={valInput}
+                onChange={(e) => setValInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handlePut()}
+              />
+            </div>
+
+            {/* Action Buttons: Put item & Get item */}
+            <div className="actions-button-pair">
+              <button
+                type="button"
+                className="btn-put-primary"
+                onClick={() => handlePut()}
+              >
+                Put item
+              </button>
+              <button
+                type="button"
+                className="btn-get-primary"
+                onClick={() => handleGet()}
+              >
+                Get item
+              </button>
+            </div>
+
+            {/* Example Operations */}
+            <div className="example-ops-container">
+              <span className="example-ops-heading">Example Operations</span>
+              <div className="example-ops-grid">
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("4", "40")}>put(4, 40)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("5", "50")}>put(5, 50)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handlePut("6", "60")}>put(6, 60)</button>
+                <button type="button" className="btn-op-pill" onClick={() => handleGet("1")}>get(1)</button>
+              </div>
+            </div>
+
+            {/* Reset Button */}
+            <div className="reset-button-wrapper">
+              <button
+                type="button"
+                className="btn-reset-link"
+                onClick={handleReset}
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Col 2: Visual Representation & Operation Log */}
-        <div className="col-visual">
-          <div className="visual-top-bar">
-            <span className="section-label">
-              Visual Representation <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--text-muted)" }}>(Click any node to get)</span>
-            </span>
-            <div className="legend-group">
-              <div className="legend-pill">
-                <span className="legend-box pink" />
-                <span>LRU</span>
-              </div>
-              <div className="legend-pill">
-                <span className="legend-box green" />
-                <span>MRU</span>
-              </div>
-            </div>
+        {/* CARD 2: 2. Cache Visualization */}
+        <div className="playground-card card-visualization">
+          <div className="card-header-simple">
+            <h3 className="card-title">2. Cache Visualization</h3>
+            <p className="card-desc">Doubly linked list showing usage order (least recently used → most recently used).</p>
           </div>
 
-          {/* Doubly Linked List Diagram (Interactive Clickable Nodes!) */}
-          <div className="dll-visual-flow">
-            {/* Head Sentinel */}
-            <div className="sentinel-block">
-              <span className="sentinel-title">Head</span>
-              <div className="box-null">NULL</div>
+          <div className="card-visualization-body">
+            {/* LRU and MRU Labels */}
+            <div className="legend-pills-row">
+              <span className="badge-lru-label">Least recently used (LRU)</span>
+              <span className="badge-mru-label">Most recently used (MRU)</span>
             </div>
 
-            <span className="arrow-bi">⇄</span>
+            {/* Doubly Linked List Visual */}
+            <div className="dll-track-wrapper">
+              {/* HEAD Sentinel */}
+              <div className="sentinel-block">
+                <span className="sentinel-tag">HEAD</span>
+                <div className="sentinel-cell">NULL</div>
+              </div>
 
-            {/* Dynamic Nodes with Click to Get & Live Glow */}
-            {nodes.length === 0 ? (
-              <span style={{ fontSize: "11px", color: "var(--text-muted)", padding: "0 10px" }}>(Empty Cache)</span>
-            ) : (
-              nodes.map((node, idx) => {
-                const isLRU = idx === 0;
-                const isMRU = idx === nodes.length - 1;
-                let colorClass = "middle";
-                if (isLRU) colorClass = "lru";
-                if (isMRU) colorClass = "mru";
+              <div className="dll-connector-arrow">→</div>
 
-                const isFlashing = activeKey === String(node.key);
+              {/* Dynamic Nodes */}
+              {nodes.map((node, index) => {
+                // Color matches mockup: Node 0 (LRU) is red/burgundy, middle is blue, last (MRU) is green
+                const colorClass = index === 0 ? "node-burgundy" : index === nodes.length - 1 ? "node-green" : "node-blue";
+                const isFlash = activeKey === String(node.key);
 
                 return (
                   <React.Fragment key={node.key}>
-                    <div
-                      className={`lru-node-box ${colorClass} ${isFlashing ? "active-flash" : ""}`}
+                    <div 
+                      className={`dll-node-box ${colorClass} ${isFlash ? "flash-highlight" : ""}`}
                       onClick={() => handleGet(node.key)}
-                      title={`Click to get(${node.key}) - promote to MRU`}
+                      title={`Click to get(${node.key})`}
                     >
-                      <span className="node-k">{node.key}</span>
-                      <span className="node-v">{node.value}</span>
+                      <div className="node-key-header">{node.key}</div>
+                      <div className="node-val-body">{node.value}</div>
                     </div>
-                    <span className="arrow-bi">⇄</span>
+
+                    {index < nodes.length - 1 ? (
+                      <div className="dll-double-arrow">⇄</div>
+                    ) : (
+                      <div className="dll-connector-arrow">→</div>
+                    )}
                   </React.Fragment>
                 );
-              })
-            )}
+              })}
 
-            {/* Tail Sentinel */}
-            <div className="sentinel-block">
-              <span className="sentinel-title">Tail</span>
-              <div className="box-null">NULL</div>
+              {/* TAIL Sentinel */}
+              <div className="sentinel-block">
+                <span className="sentinel-tag">TAIL</span>
+                <div className="sentinel-cell">NULL</div>
+              </div>
             </div>
-          </div>
 
-          {/* Hash Map Box */}
-          <div className="hash-map-section">
-            <span className="hash-map-title">Hash Map (O(1) Pointers)</span>
-            <div className="hash-map-table">
-              {nodes.map((n) => (
-                <div
-                  key={n.key}
-                  className={`hash-map-row ${activeKey === String(n.key) ? "highlight" : ""}`}
-                  onClick={() => handleGet(n.key)}
-                  style={{ cursor: "pointer" }}
-                  title={`Click to get(${n.key})`}
-                >
-                  <span className="hm-k">{n.key}</span>
-                  <span className="hm-arr">→</span>
-                  <span className="hm-v">node({n.key}, {n.value})</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Operation Log */}
-          <div className="operation-log-section">
-            <span className="section-label">Operation Log</span>
-            <div className="log-items-list">
-              {logs.map((log) => (
-                <div key={log.step} className="log-item-row">
-                  <span className={`log-badge-num ${log.type === "get" ? "green" : log.type === "miss" ? "pink" : ""}`}>
-                    {log.step}
-                  </span>
-                  <span className="log-text">{log.text}</span>
-                  <span className="log-time">{log.time}</span>
-                </div>
-              ))}
+            {/* Hash Map Table */}
+            <div className="hashmap-section">
+              <h4 className="hashmap-heading">Hash Map (Key → Node)</h4>
+              <div className="hashmap-table">
+                {nodes.map((node, index) => {
+                  const badgeColorClass = index === 0 ? "key-burgundy" : index === nodes.length - 1 ? "key-green" : "key-blue";
+                  return (
+                    <div key={node.key} className="hashmap-entry-row">
+                      <span className={`hashmap-key-badge ${badgeColorClass}`}>{node.key}</span>
+                      <span className="hashmap-map-arrow">→</span>
+                      <div className="hashmap-target-pill">
+                        node ({node.key}, {node.value})
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Col 3: Code & Explanation */}
-        <div className="col-code">
-          <div className="code-header-bar">
-            <span className="section-label">Code (Python)</span>
-            <label className="toggle-switch-wrap">
-              <span>Highlight Line</span>
-              <input
-                type="checkbox"
-                className="switch-input"
-                checked={highlightCode}
-                onChange={(e) => setHighlightCode(e.target.checked)}
-              />
-            </label>
+        {/* CARD 3: 3. What just happened? */}
+        <div className="playground-card card-explanation">
+          <div className="card-header-simple">
+            <h3 className="card-title">3. What just happened?</h3>
+            <p className="card-desc">Explanation of the current operation.</p>
           </div>
 
-          {/* Code Editor Block */}
-          <div className="code-editor-box">
-            {codeLines.map((line) => {
-              const isHl = highlightCode && line.num === activeCodeLine;
-              return (
-                <div key={line.num} className={`code-line ${isHl ? "highlight" : ""}`}>
-                  <span className="line-no">{line.num}</span>
-                  <span>{line.text}</span>
-                </div>
-              );
-            })}
-          </div>
+          <div className="card-explanation-body">
+            {/* Status Alert Banner */}
+            <div className={`status-alert-card ${explanation.statusType}`}>
+              <div className="status-alert-icon-col">
+                {explanation.statusType === "hit" ? (
+                  <CheckCircle2 size={24} className="icon-hit-success" />
+                ) : explanation.statusType === "put" ? (
+                  <PlusCircle size={24} className="icon-put-info" />
+                ) : (
+                  <XCircle size={24} className="icon-miss-danger" />
+                )}
+              </div>
+              <div className="status-alert-text-col">
+                <h4 className="status-alert-title">{explanation.headline}</h4>
+                <p className="status-alert-sub">{explanation.sub1}</p>
+                {explanation.sub2 && <p className="status-alert-sub">{explanation.sub2}</p>}
+                {explanation.sub3 && <p className="status-alert-sub">{explanation.sub3}</p>}
+              </div>
+            </div>
 
-          {/* Explanation Card */}
-          <div className="explanation-card">
-            <h4 className="explanation-title">{explanation.title}</h4>
-            <ul className="explanation-bullets">
-              {explanation.bullets.map((b, i) => (
-                <li key={i}>{b}</li>
-              ))}
-            </ul>
+            {/* Why? Section */}
+            <div className="why-explanation-section">
+              <h4 className="why-heading">Why?</h4>
+              <ul className="why-bullet-list">
+                {explanation.bullets.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>
-    </section>
+
+      {/* Bottom Row: 4. Operation Log */}
+      <div className="playground-card card-operation-log">
+        <div className="oplog-top-bar">
+          <div className="oplog-title-area">
+            <h3 className="card-title">4. Operation Log</h3>
+            <p className="card-desc">Last {logs.length} operations performed on the cache.</p>
+          </div>
+
+          <div className="oplog-actions-area">
+            <button
+              type="button"
+              className="btn-next-step-blue"
+              onClick={handleNextStep}
+            >
+              <span>&gt; Next step</span>
+            </button>
+
+            <button
+              type="button"
+              className={`btn-autoplay-log ${isAutoPlaying ? "playing" : ""}`}
+              onClick={handleToggleAutoPlay}
+            >
+              {isAutoPlaying ? <Square size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
+              <span>{isAutoPlaying ? "Pause" : "Auto-play"}</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-show-code-toggle"
+              onClick={() => setShowCode(!showCode)}
+            >
+              <Code size={13} />
+              <span>Show code {showCode ? "▲" : "▼"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Log Entries */}
+        <div className="oplog-items-list">
+          {logs.slice(-3).map((item, idx) => (
+            <div key={item.step || idx} className="oplog-item-row">
+              <div className="oplog-item-left">
+                <span className="oplog-step-badge">{item.step || idx + 1}</span>
+                <span className="oplog-item-text">{item.text}</span>
+              </div>
+              <span className="oplog-item-time">{item.time}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Expandable Code Drawer */}
+        {showCode && (
+          <div className="code-drawer-panel">
+            <div className="code-drawer-header">
+              <span className="code-filename">lru_cache.py (Python O(1) Core Implementation)</span>
+              <span className="code-lang">Python 3</span>
+            </div>
+            <pre className="code-pre">
+              <code>
+                {codeLines.map((line) => (
+                  <div
+                    key={line.num}
+                    className={`code-line-row ${line.num === activeCodeLine ? "highlight-line" : ""}`}
+                  >
+                    <span className="line-num">{line.num}</span>
+                    <span className="line-text">{line.text}</span>
+                  </div>
+                ))}
+              </code>
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
